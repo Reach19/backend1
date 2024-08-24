@@ -1,6 +1,7 @@
-gunicorn==20.1.0
-requests==2.31.0
-SQLAlchemy==2.0.21
+gunicorn
+requests
+SQLAlchemy
 Flask
 Flask-SQLAlchemy
 Flask-Migrate
+python-telegram-bot
