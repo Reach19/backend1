@@ -19,7 +19,7 @@ class Config:
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io/giveaway-webview/"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
