@@ -62,9 +62,9 @@ class Participant(db.Model):
 # Utility functions for the bot
 def check_bot_admin(channel_username):
     try:
-        chat = bot.get_chat(channel_username)
+        chat = bot.get_chat(channel_username)  # Make sure this is a synchronous call or adapt accordingly
         chat_id = chat.id
-        member = bot.get_chat_member(chat_id, bot.id)
+        member = bot.get_chat_member(chat_id, bot.id)  # Same here
         return chat_id, member.status in ['administrator', 'creator']
     except TelegramError as e:
         raise Exception(f"Error checking bot admin status: {str(e)}")
