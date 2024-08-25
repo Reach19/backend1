@@ -6,7 +6,7 @@ import os
 import requests
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 # Configuring the SQLAlchemy Database URI and initializing the database
