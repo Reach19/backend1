@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
+from datetime import datetime
 import os
 import random
-from datetime import datetime
 from telegram import Bot
 from telegram.error import TelegramError
+from flask_cors import CORS, cross_origin
 
 # Configuration class for Flask and other services
 class Config:
@@ -20,7 +20,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins, adjust as necessary
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
@@ -82,11 +82,19 @@ def post_winners_to_channel(chat_id, message):
         raise Exception(f"Error posting winners to channel: {str(e)}")
 
 # Flask Routes
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://eyob2one.github.io')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
 @app.route('/')
 def home():
     return render_template('index.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
+@cross_origin(origin='https://eyob2one.github.io')
 def add_channel():
     try:
         channel_username = request.form.get('channel_username')
@@ -102,6 +110,7 @@ def add_channel():
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/create_giveaway', methods=['POST'])
+@cross_origin(origin='https://eyob2one.github.io')
 def create_giveaway():
     channel_username = request.form.get('channel')
     giveaway_name = request.form.get('giveaway_name')
@@ -143,6 +152,7 @@ def create_giveaway():
         return jsonify({'success': False, 'message': 'Channel not found.'}), 404
 
 @app.route('/announce_winners/<int:giveaway_id>', methods=['GET'])
+@cross_origin(origin='https://eyob2one.github.io')
 def announce_winners(giveaway_id):
     giveaway = Giveaway.query.get_or_404(giveaway_id)
     participants = Participant.query.filter_by(giveaway_id=giveaway_id).all()
