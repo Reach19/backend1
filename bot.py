@@ -1,67 +1,57 @@
-import logging
+# bot.py
+
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext
-import asyncio
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app import Channel, Giveaway, Participant, db
+import os
 
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+TELEGRAM_API_TOKEN = os.getenv('TELEGRAM_API_TOKEN', '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8')
 
-# Initialize Telegram bot
-TELEGRAM_API_TOKEN = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
+engine = create_engine(os.getenv('SQLALCHEMY_DATABASE_URI', 'postgresql://postgres.elaqzrcvbknbzvbkdwgp:iCcxsx4TpDLdwqzq@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'))
+Session = sessionmaker(bind=engine)
+session = Session()
 
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Welcome to the Giveaway Bot!")
-    logger.info(f"User {update.effective_user.id} started the bot.")
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text('Welcome! Use /create_giveaway to start a giveaway.')
 
-async def create(update: Update, context: CallbackContext):
-    await update.message.reply_text("Giveaway created successfully!")
-    logger.info(f"User {update.effective_user.id} created a giveaway.")
+def create_giveaway(update: Update, context: CallbackContext) -> None:
+    # Implement your giveaway creation logic
+    update.message.reply_text('Please provide giveaway details.')
 
-async def join(update: Update, context: CallbackContext):
-    await update.message.reply_text("You have joined the giveaway!")
-    logger.info(f"User {update.effective_user.id} joined a giveaway.")
-
-async def run_bot():
-    # Initialize the application
-    application = Application.builder().token(TELEGRAM_API_TOKEN).build()
-
-    # Add command handlers
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('create', create))
-    application.add_handler(CommandHandler('join', join))
-
-    await application.initialize()
-
-    # Start polling for updates
-    await application.start()
+def join_giveaway(update: Update, context: CallbackContext) -> None:
+    giveaway_id = context.args[0]
+    user = update.message.from_user.username
+    if not user:
+        update.message.reply_text('Could not retrieve your username.')
+        return
     
-    logger.info("Bot started. Waiting for updates...")
+    giveaway = session.query(Giveaway).get(giveaway_id)
+    if giveaway:
+        participant = Participant(username=user, giveaway_id=giveaway.id)
+        session.add(participant)
+        session.commit()
+        update.message.reply_text(f'You have joined giveaway {giveaway_id}.')
+    else:
+        update.message.reply_text('Giveaway not found.')
 
-    # Keep the bot running with idle()
-    try:
-        await asyncio.Event().wait()  # Keeps the bot running indefinitely
-    except KeyboardInterrupt:
-        logger.info("Bot interrupted and stopping...")
-    finally:
-        await application.stop()
-        logger.info("Bot stopped.")
+def announce_winners(update: Update, context: CallbackContext) -> None:
+    # Fetch winners from the database and announce them
+    update.message.reply_text('Winners have been announced.')
 
-def main():
-    # Run the bot
-    try:
-        asyncio.run(run_bot())
-    except RuntimeError as e:
-        if "Cannot close a running event loop" in str(e):
-            # Skip closing the event loop as it's already running
-            logger.warning("Attempted to close a running event loop.")
-        else:
-            logger.error("An unexpected RuntimeError occurred.", exc_info=True)
-            raise
+def main() -> None:
+    updater = Updater(TELEGRAM_API_TOKEN)
+
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CommandHandler('create_giveaway', create_giveaway))
+    dispatcher.add_handler(CommandHandler('join_giveaway', join_giveaway))
+    dispatcher.add_handler(CommandHandler('announce_winners', announce_winners))
+
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
     main()
-
