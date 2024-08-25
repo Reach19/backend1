@@ -6,7 +6,7 @@ import random
 import threading
 from telegram import Bot
 from telegram.error import TelegramError
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 
 # Configuration class for Flask and other services 
 class Config:
