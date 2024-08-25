@@ -21,7 +21,10 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io"}})
+CORS(app, origins=["https://eyob2one.github.io"])
+
+# Or if you want to be more specific, allow only the giveaway-webview path:
+CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io/giveaway-webview/*"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
