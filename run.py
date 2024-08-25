@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 import random
 from telegram import Bot, Update
-from telegram.ext import  Application, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext
 from telegram.error import TelegramError
 from flask_cors import CORS  # Import CORS
 
@@ -88,7 +88,7 @@ def home():
 
 @app.route('/add_channel', methods=['POST'])
 def add_channel():
-    channel_username = request.form['channel_username']
+    channel_username = request.form.get('channel_username')
     try:
         chat_id, bot_is_admin = check_bot_admin(channel_username)
         if bot_is_admin:
@@ -103,17 +103,17 @@ def add_channel():
 
 @app.route('/create_giveaway', methods=['POST'])
 def create_giveaway():
-    channel_username = request.form['channel']
-    giveaway_name = request.form['giveaway_name']
-    prize_amount = float(request.form['prize_amount'])
-    participants_count = int(request.form['participants_count'])
-    end_date = datetime.fromisoformat(request.form['end_date'])
+    channel_username = request.form.get('channel')
+    giveaway_name = request.form.get('giveaway_name')
+    prize_amount = float(request.form.get('prize_amount'))
+    participants_count = int(request.form.get('participants_count'))
+    end_date = datetime.fromisoformat(request.form.get('end_date'))
     
     selected_channel = Channel.query.filter_by(username=channel_username).first()
     
     if selected_channel:
         new_giveaway = Giveaway(
-            bot_username=request.form['bot_username'],
+            bot_username=request.form.get('bot_username'),
             amount=prize_amount,
             participant_count=participants_count,
             end_date=end_date,
