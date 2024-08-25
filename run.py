@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 import random
 from telegram import Bot, Update
-from telegram.ext import Dispatcher, CommandHandler
+from telegram.ext import Application, CommandHandler, CallbackContext
 from telegram.error import TelegramError
 
 # Configuration class for Flask and other services
@@ -21,7 +21,8 @@ db = SQLAlchemy(app)
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
-dispatcher = Dispatcher(bot, None, workers=0)
+application = Application.builder().token(app.config['TELEGRAM_API_TOKEN']).build()
+
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -89,7 +90,7 @@ def add_channel():
     try:
         chat_id, bot_is_admin = check_bot_admin(channel_username)
         if bot_is_admin:
-            new_channel = Channel(username=channel_username, chat_id=chat_id)
+            new_channel = Channel(username=channel_username, chat_id=chat_id, user_id=1)  # Adjust user_id as needed
             db.session.add(new_channel)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Channel added successfully!'})
@@ -164,23 +165,25 @@ def announce_winners(giveaway_id):
     return jsonify({'success': True, 'winners': [{'username': winner.username} for winner in winners]})
 
 # Telegram Command Handlers
-def start(update: Update, context):
-    update.message.reply_text("Welcome to the Giveaway Bot!")
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("Welcome to the Giveaway Bot!")
 
-def create(update: Update, context):
+async def create(update: Update, context: CallbackContext):
     # Extract data from the message and create a giveaway
-    update.message.reply_text("Giveaway created successfully!")
+    await update.message.reply_text("Giveaway created successfully!")
 
-def join(update: Update, context):
+async def join(update: Update, context: CallbackContext):
     # Extract data from the message and join a giveaway
-    update.message.reply_text("You have joined the giveaway!")
+    await update.message.reply_text("You have joined the giveaway!")
 
-dispatcher.add_handler(CommandHandler('start', start))
-dispatcher.add_handler(CommandHandler('create', create))
-dispatcher.add_handler(CommandHandler('join', join))
+application.add_handler(CommandHandler('start', start))
+application.add_handler(CommandHandler('create', create))
+application.add_handler(CommandHandler('join', join))
 
 # Main application entry point
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Ensure all tables are created
+
+    # Run Flask application
     app.run(host='0.0.0.0', port=5000, debug=True)
