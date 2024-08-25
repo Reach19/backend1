@@ -20,7 +20,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io/giveaway-webview/"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
@@ -93,7 +93,7 @@ def after_request(response):
 def home():
     return render_template('index.html', channels=Channel.query.all())
 
-@app.route('/add_channel', methods=['POST'])
+@app.route('/add_channel', methods=['POST', 'OPTIONS'])
 def add_channel():
     try:
         channel_username = request.form.get('channel_username')
