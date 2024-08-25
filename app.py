@@ -48,13 +48,21 @@ def add_channel():
 
         # Check if the bot is an admin in the channel
         bot_token = os.getenv('TELEGRAM_API_TOKEN')
+        if not bot_token:
+            return jsonify({'success': False, 'message': 'Bot token is missing.'}), 500
+
+        bot_user_id = bot_token.split(':')[0]  # Extract the bot user ID from the token
         chat_member_url = f'https://api.telegram.org/bot{bot_token}/getChatMember'
         response = requests.get(chat_member_url, params={
             'chat_id': f'@{username}',
-            'user_id': bot_token.split(':')[0]  # Bot user ID extracted from the token
+            'user_id': bot_user_id
         })
 
-        if response.status_code != 200 or 'administrator' not in response.json().get('result', {}).get('status', ''):
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': 'Failed to verify bot status in the channel.'}), 500
+
+        chat_member_data = response.json().get('result', {})
+        if 'administrator' not in chat_member_data.get('status', ''):
             return jsonify({'success': False, 'message': 'Bot is not an admin in the channel'}), 403
 
         channel = Channel(username=username, creator_id=creator_id)
@@ -94,6 +102,9 @@ def create_giveaway():
         channel_id = data.get('channel_id')
         creator_id = data.get('creator_id')
 
+        if not name or not prize_amount or not participants_count or not end_date or not channel_id or not creator_id:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+
         giveaway = Giveaway(name=name, prize_amount=prize_amount, participants_count=participants_count,
                             end_date=end_date, channel_id=channel_id, creator_id=creator_id)
         
@@ -124,4 +135,3 @@ def create_giveaway():
 # Run the Flask app
 if __name__ == '__main__':
     app.run()
-
