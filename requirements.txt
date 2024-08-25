@@ -5,3 +5,4 @@ Flask
 Flask-SQLAlchemy
 Flask-Migrate
 python-telegram-bot
+psycopg2-binary

@@ -15,14 +15,12 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    # Import models here
-    from app import models
-
     # Import and register the main Blueprint
     from app.routes import main_bp
     app.register_blueprint(main_bp)
 
     return app
+
 
 
 
