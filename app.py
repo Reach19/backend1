@@ -48,7 +48,7 @@ def add_channel():
             return jsonify({'success': False, 'message': 'Missing username or creator_id'}), 400
 
         # Check if the bot is an admin in the channel
-        bot_token = os.getenv('TELEGRAM_API_TOKEN')
+        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
         if not bot_token:
             return jsonify({'success': False, 'message': 'Bot token is missing.'}), 500
 
