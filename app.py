@@ -5,7 +5,7 @@ import os
 import random
 from telegram import Bot
 from telegram.error import TelegramError
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 
 # Configuration class for Flask and other services
 class Config:
@@ -20,7 +20,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
@@ -89,12 +89,11 @@ def after_request(response):
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
     return response
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return render_template('index.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
-@cross_origin(origin='https://eyob2one.github.io')
 def add_channel():
     try:
         channel_username = request.form.get('channel_username')
@@ -110,71 +109,75 @@ def add_channel():
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/create_giveaway', methods=['POST'])
-@cross_origin(origin='https://eyob2one.github.io')
 def create_giveaway():
-    channel_username = request.form.get('channel')
-    giveaway_name = request.form.get('giveaway_name')
-    prize_amount = float(request.form.get('prize_amount'))
-    participants_count = int(request.form.get('participants_count'))
-    end_date = datetime.fromisoformat(request.form.get('end_date'))
-    
-    selected_channel = Channel.query.filter_by(username=channel_username).first()
-    
-    if selected_channel:
-        new_giveaway = Giveaway(
-            bot_username=request.form.get('bot_username'),
-            amount=prize_amount,
-            participant_count=participants_count,
-            end_date=end_date,
-            channel_id=selected_channel.id,
-            user_id=1  # Adjust as needed
-        )
-        db.session.add(new_giveaway)
-        db.session.commit()
+    try:
+        channel_username = request.form.get('channel')
+        giveaway_name = request.form.get('giveaway_name')
+        prize_amount = float(request.form.get('prize_amount'))
+        participants_count = int(request.form.get('participants_count'))
+        end_date = datetime.fromisoformat(request.form.get('end_date'))
+        
+        selected_channel = Channel.query.filter_by(username=channel_username).first()
+        
+        if selected_channel:
+            new_giveaway = Giveaway(
+                bot_username=request.form.get('bot_username'),
+                amount=prize_amount,
+                participant_count=participants_count,
+                end_date=end_date,
+                channel_id=selected_channel.id,
+                user_id=1  # Adjust as needed
+            )
+            db.session.add(new_giveaway)
+            db.session.commit()
 
-        message = (
-            f"🎉 New Giveaway Alert! 🎉\n\n"
-            f"💰 Amount: {new_giveaway.amount} Birr\n"
-            f"👥 Participants: {new_giveaway.participant_count}\n"
-            f"🕒 Ends on: {new_giveaway.end_date.strftime('%Y-%m-%d %H:%M')}\n\n"
-            f"Join now and stand a chance to win!"
-        )
-        try:
-            post_to_channel(selected_channel.chat_id, message)
-        except Exception as e:
-            return jsonify({'success': False, 'message': f'Failed to post giveaway to channel: {str(e)}'}), 500
-        
-        new_giveaway.url = f"https://t.me/giveaway_setota_bot/Giveaway/giveaway/{new_giveaway.id}"
-        db.session.commit()
-        
-        return jsonify({'success': True, 'message': 'Giveaway created successfully!'})
-    else:
-        return jsonify({'success': False, 'message': 'Channel not found.'}), 404
+            message = (
+                f"🎉 New Giveaway Alert! 🎉\n\n"
+                f"💰 Amount: {new_giveaway.amount} Birr\n"
+                f"👥 Participants: {new_giveaway.participant_count}\n"
+                f"🕒 Ends on: {new_giveaway.end_date.strftime('%Y-%m-%d %H:%M')}\n\n"
+                f"Join now and stand a chance to win!"
+            )
+            try:
+                post_to_channel(selected_channel.chat_id, message)
+            except Exception as e:
+                return jsonify({'success': False, 'message': f'Failed to post giveaway to channel: {str(e)}'}), 500
+            
+            new_giveaway.url = f"https://t.me/giveaway_setota_bot/Giveaway/giveaway/{new_giveaway.id}"
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Giveaway created successfully!'})
+        else:
+            return jsonify({'success': False, 'message': 'Channel not found.'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/announce_winners/<int:giveaway_id>', methods=['GET'])
-@cross_origin(origin='https://eyob2one.github.io')
 def announce_winners(giveaway_id):
-    giveaway = Giveaway.query.get_or_404(giveaway_id)
-    participants = Participant.query.filter_by(giveaway_id=giveaway_id).all()
-
-    winners = random.sample(participants, min(giveaway.participant_count, len(participants)))
-
-    giveaway.winners = [winner.id for winner in winners]
-    db.session.commit()
-
-    winner_list = "\n".join([f"@{winner.username}" for winner in winners])
-    message = (
-        f"🎉 Congratulations to the winners of our recent giveaway! 🎉\n\n"
-        f"The following participants were randomly selected:\n\n"
-        f"{winner_list}\n\n"
-        f"View more details here: {giveaway.url}"
-    )
     try:
-        post_winners_to_channel(giveaway.channel_id, message)
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to announce winners: {str(e)}'}), 500
+        giveaway = Giveaway.query.get_or_404(giveaway_id)
+        participants = Participant.query.filter_by(giveaway_id=giveaway_id).all()
 
-    return jsonify({'success': True, 'message': 'Winners announced successfully!'})
+        winners = random.sample(participants, min(giveaway.participant_count, len(participants)))
+
+        giveaway.winners = [winner.id for winner in winners]
+        db.session.commit()
+
+        winner_list = "\n".join([f"@{winner.username}" for winner in winners])
+        message = (
+            f"🎉 Congratulations to the winners of our recent giveaway! 🎉\n\n"
+            f"The following participants were randomly selected:\n\n"
+            f"{winner_list}\n\n"
+            f"View more details here: {giveaway.url}"
+        )
+        try:
+            post_winners_to_channel(giveaway.channel_id, message)
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to announce winners: {str(e)}'}), 500
+
+        return jsonify({'success': True, 'message': 'Winners announced successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
