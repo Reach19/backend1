@@ -98,6 +98,7 @@ def home():
     return render_template('index.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
+@cross_origin(origins="https://eyob2one.github.io")
 def add_channel():
     channel_username = request.form.get('channel_username')
     try:
@@ -186,3 +187,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Ensure all tables are created
     app.run(host='0.0.0.0', port=5000, debug=True)
+
