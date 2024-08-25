@@ -1,57 +1,87 @@
-# bot.py
+import logging
+from telegram import Bot
+from telegram.ext import Application, ContextTypes
+import requests
 
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app import Channel, Giveaway, Participant, db
-import os
+# Replace with your actual Telegram API token
+TELEGRAM_API_TOKEN = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
+# Replace with your actual backend URL
+BACKEND_URL = 'https://backend1-production-29e4.up.railway.app'
 
-TELEGRAM_API_TOKEN = os.getenv('TELEGRAM_API_TOKEN', '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8')
+# Set up logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-engine = create_engine(os.getenv('SQLALCHEMY_DATABASE_URI', 'postgresql://postgres.elaqzrcvbknbzvbkdwgp:iCcxsx4TpDLdwqzq@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'))
-Session = sessionmaker(bind=engine)
-session = Session()
+async def notify_participant(user_id: int, message: str) -> None:
+    try:
+        bot = Bot(token=TELEGRAM_API_TOKEN)
+        await bot.send_message(chat_id=user_id, text=message)
+    except Exception as e:
+        logger.error(f"Error sending message to user {user_id}: {e}")
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Welcome! Use /create_giveaway to start a giveaway.')
+async def notify_winner(user_id: int, message: str) -> None:
+    try:
+        bot = Bot(token=TELEGRAM_API_TOKEN)
+        await bot.send_message(chat_id=user_id, text=message)
+    except Exception as e:
+        logger.error(f"Error sending message to user {user_id}: {e}")
 
-def create_giveaway(update: Update, context: CallbackContext) -> None:
-    # Implement your giveaway creation logic
-    update.message.reply_text('Please provide giveaway details.')
+async def post_giveaway_announcement(channel_id: int, message: str) -> None:
+    try:
+        bot = Bot(token=TELEGRAM_API_TOKEN)
+        await bot.send_message(chat_id=channel_id, text=message)
+    except Exception as e:
+        logger.error(f"Error posting message to channel {channel_id}: {e}")
 
-def join_giveaway(update: Update, context: CallbackContext) -> None:
-    giveaway_id = context.args[0]
-    user = update.message.from_user.username
-    if not user:
-        update.message.reply_text('Could not retrieve your username.')
-        return
+async def main() -> None:
+    # Create the application and pass it your bot's token
+    application = Application.builder().token(TELEGRAM_API_TOKEN).build()
     
-    giveaway = session.query(Giveaway).get(giveaway_id)
-    if giveaway:
-        participant = Participant(username=user, giveaway_id=giveaway.id)
-        session.add(participant)
-        session.commit()
-        update.message.reply_text(f'You have joined giveaway {giveaway_id}.')
-    else:
-        update.message.reply_text('Giveaway not found.')
+    # Fetch and handle data from the backend
+    # Example of posting giveaway announcements to a channel
+    async def fetch_and_post_announcements():
+        try:
+            response = requests.get(f"{BACKEND_URL}/get_giveaway_announcements")
+            data = response.json()
+            
+            if data.get('success'):
+                announcements = data.get('announcements', [])
+                for announcement in announcements:
+                    channel_id = announcement['channel_id']
+                    message = announcement['message']
+                    await post_giveaway_announcement(channel_id, message)
+            else:
+                logger.info("No announcements to post.")
+        except Exception as e:
+            logger.error(f"Error fetching announcements: {e}")
 
-def announce_winners(update: Update, context: CallbackContext) -> None:
-    # Fetch winners from the database and announce them
-    update.message.reply_text('Winners have been announced.')
+    # Fetch and notify participants and winners periodically
+    async def notify_participants_and_winners():
+        try:
+            response = requests.get(f"{BACKEND_URL}/get_pending_notifications")
+            data = response.json()
+            
+            if data.get('success'):
+                notifications = data.get('notifications', [])
+                for notification in notifications:
+                    user_id = notification['user_id']
+                    message = notification['message']
+                    if notification['type'] == 'participant':
+                        await notify_participant(user_id, message)
+                    elif notification['type'] == 'winner':
+                        await notify_winner(user_id, message)
+            else:
+                logger.info("No notifications to send.")
+        except Exception as e:
+            logger.error(f"Error fetching notifications: {e}")
 
-def main() -> None:
-    updater = Updater(TELEGRAM_API_TOKEN)
-
-    dispatcher = updater.dispatcher
-
-    dispatcher.add_handler(CommandHandler('start', start))
-    dispatcher.add_handler(CommandHandler('create_giveaway', create_giveaway))
-    dispatcher.add_handler(CommandHandler('join_giveaway', join_giveaway))
-    dispatcher.add_handler(CommandHandler('announce_winners', announce_winners))
-
-    updater.start_polling()
-    updater.idle()
+    # Run tasks periodically
+    while True:
+        await fetch_and_post_announcements()
+        await notify_participants_and_winners()
+        # Sleep for a while before running the tasks again (adjust as needed)
+        await asyncio.sleep(60)
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
