@@ -42,23 +42,25 @@ def index():
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
 def add_channel():
-    data = request.get_json()
-
-    username = data.get('username')
-    creator_id = data.get('creator_id')
-
-    # Check if the bot is an admin in the channel
-    bot_token = os.getenv('TELEGRAM_API_TOKEN')
-    chat_member_url = f'https://api.telegram.org/bot{bot_token}/getChatMember'
-    response = requests.get(chat_member_url, params={
-        'chat_id': f'@{username}',
-        'user_id': bot_token.split(':')[0]  # Bot user ID extracted from the token
-    })
-
-    if response.status_code != 200 or 'administrator' not in response.json().get('result', {}).get('status', ''):
-        return jsonify({'success': False, 'message': 'Bot is not an admin in the channel'}), 403
-
     try:
+        data = request.get_json()
+        username = data.get('username')
+        creator_id = data.get('creator_id')
+
+        if not username or not creator_id:
+            return jsonify({'success': False, 'message': 'Missing username or creator_id'}), 400
+
+        # Check if the bot is an admin in the channel
+        bot_token = os.getenv('TELEGRAM_API_TOKEN')
+        chat_member_url = f'https://api.telegram.org/bot{bot_token}/getChatMember'
+        response = requests.get(chat_member_url, params={
+            'chat_id': f'@{username}',
+            'user_id': bot_token.split(':')[0]  # Bot user ID extracted from the token
+        })
+
+        if response.status_code != 200 or 'administrator' not in response.json().get('result', {}).get('status', ''):
+            return jsonify({'success': False, 'message': 'Bot is not an admin in the channel'}), 403
+
         channel = Channel(username=username, creator_id=creator_id)
         db.session.add(channel)
         db.session.commit()
@@ -66,14 +68,22 @@ def add_channel():
     except IntegrityError:
         db.session.rollback()
         return jsonify({'success': False, 'message': 'Channel already exists or another error occurred.'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # Endpoint to get channels for a specific creator
 @app.route('/get_channels', methods=['GET'])
 def get_channels():
-    creator_id = request.args.get('creator_id')
-    channels = Channel.query.filter_by(creator_id=creator_id).all()
-    channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
-    return jsonify({'success': True, 'channels': channel_list})
+    try:
+        creator_id = request.args.get('creator_id')
+        if not creator_id:
+            return jsonify({'success': False, 'message': 'Missing creator_id parameter'}), 400
+        
+        channels = Channel.query.filter_by(creator_id=creator_id).all()
+        channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
+        return jsonify({'success': True, 'channels': channel_list})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # Endpoint to create a giveaway
 @app.route('/create_giveaway', methods=['POST'])
