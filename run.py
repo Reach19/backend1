@@ -4,8 +4,9 @@ from datetime import datetime
 import os
 import random
 from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, CallbackContext
+from telegram.ext import Dispatcher, Application, CommandHandler, CallbackContext
 from telegram.error import TelegramError
+from flask_cors import CORS  # Import CORS
 
 # Configuration class for Flask and other services
 class Config:
@@ -18,11 +19,11 @@ class Config:
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
+CORS(app)  # Enable CORS for all routes
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
-application = Application.builder().token(app.config['TELEGRAM_API_TOKEN']).build()
-
+dispatcher = Dispatcher(bot, None, workers=0)
 # Database Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)

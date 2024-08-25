@@ -4,5 +4,6 @@ SQLAlchemy
 Flask
 Flask-SQLAlchemy
 Flask-Migrate
+Flask-CORS
 python-telegram-bot
 psycopg2-binary
