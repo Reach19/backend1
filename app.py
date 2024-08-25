@@ -20,7 +20,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, resources={r"/add_channel": {"origins": "https://eyob2one.github.io"}})
+CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
