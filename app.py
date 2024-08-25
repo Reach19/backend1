@@ -19,7 +19,9 @@ class Config:
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
-CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io/giveaway-webview/"}})
+
+# CORS setup
+CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
@@ -81,6 +83,13 @@ def post_winners_to_channel(chat_id, message):
         raise Exception(f"Error posting winners to channel: {str(e)}")
 
 # Flask Routes
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'https://eyob2one.github.io')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
 @app.route('/')
 def home():
     return render_template('index.html', channels=Channel.query.all())
