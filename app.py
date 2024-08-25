@@ -3,10 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
 import random
-import threading
-from telegram import Bot
-from telegram.error import TelegramError
-from flask_cors import CORS, cross_origin
+from telegram import Bot, TelegramError
+from flask_cors import CORS
 
 # Configuration class for Flask and other services 
 class Config:
@@ -21,10 +19,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 
 # CORS setup
-CORS(app, origins=["https://eyob2one.github.io"])
-
-# Or if you want to be more specific, allow only the giveaway-webview path:
-CORS(app, resources={r"/*": {"origins": "https://eyob2one.github.io/giveaway-webview/*"}})
+CORS(app, resources={r"/add_channel": {"origins": "https://eyob2one.github.io"}})
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
@@ -98,7 +93,6 @@ def home():
     return render_template('index.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
-@cross_origin(origins="https://eyob2one.github.io")
 def add_channel():
     channel_username = request.form.get('channel_username')
     try:
@@ -107,11 +101,7 @@ def add_channel():
             new_channel = Channel(username=channel_username, chat_id=chat_id, user_id=1)  # Adjust user_id as needed
             db.session.add(new_channel)
             db.session.commit()
-            response = jsonify({'success': True, 'message': 'Channel added successfully!'})
-            response.headers['Access-Control-Allow-Origin'] = 'https://eyob2one.github.io'
-            response.headers['Access-Control-Allow-Methods'] = 'POST'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-            return response
+            return jsonify({'success': True, 'message': 'Channel added successfully!'})
         else:
             return jsonify({'success': False, 'message': 'Bot is not an admin in this channel. Please make the bot an admin and try again.'}), 403
     except Exception as e:
