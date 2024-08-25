@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
 import random
-from telegram import Bot, TelegramError
+from telegram import Bot
+from telegram.error import TelegramError
 from flask_cors import CORS
 
 # Configuration class for Flask and other services 
