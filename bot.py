@@ -1,6 +1,7 @@
 import logging
+import asyncio
 from telegram import Bot
-from telegram.ext import Application, ContextTypes
+from telegram.ext import Application
 import requests
 
 # Replace with your actual Telegram API token
@@ -33,53 +34,47 @@ async def post_giveaway_announcement(channel_id: int, message: str) -> None:
     except Exception as e:
         logger.error(f"Error posting message to channel {channel_id}: {e}")
 
+async def fetch_and_post_announcements():
+    try:
+        response = requests.get(f"{BACKEND_URL}/get_giveaway_announcements")
+        data = response.json()
+        
+        if data.get('success'):
+            announcements = data.get('announcements', [])
+            for announcement in announcements:
+                channel_id = announcement['channel_id']
+                message = announcement['message']
+                await post_giveaway_announcement(channel_id, message)
+        else:
+            logger.info("No announcements to post.")
+    except Exception as e:
+        logger.error(f"Error fetching announcements: {e}")
+
+async def notify_participants_and_winners():
+    try:
+        response = requests.get(f"{BACKEND_URL}/get_pending_notifications")
+        data = response.json()
+        
+        if data.get('success'):
+            notifications = data.get('notifications', [])
+            for notification in notifications:
+                user_id = notification['user_id']
+                message = notification['message']
+                if notification['type'] == 'participant':
+                    await notify_participant(user_id, message)
+                elif notification['type'] == 'winner':
+                    await notify_winner(user_id, message)
+        else:
+            logger.info("No notifications to send.")
+    except Exception as e:
+        logger.error(f"Error fetching notifications: {e}")
+
 async def main() -> None:
-    # Create the application and pass it your bot's token
     application = Application.builder().token(TELEGRAM_API_TOKEN).build()
     
-    # Fetch and handle data from the backend
-    # Example of posting giveaway announcements to a channel
-    async def fetch_and_post_announcements():
-        try:
-            response = requests.get(f"{BACKEND_URL}/get_giveaway_announcements")
-            data = response.json()
-            
-            if data.get('success'):
-                announcements = data.get('announcements', [])
-                for announcement in announcements:
-                    channel_id = announcement['channel_id']
-                    message = announcement['message']
-                    await post_giveaway_announcement(channel_id, message)
-            else:
-                logger.info("No announcements to post.")
-        except Exception as e:
-            logger.error(f"Error fetching announcements: {e}")
-
-    # Fetch and notify participants and winners periodically
-    async def notify_participants_and_winners():
-        try:
-            response = requests.get(f"{BACKEND_URL}/get_pending_notifications")
-            data = response.json()
-            
-            if data.get('success'):
-                notifications = data.get('notifications', [])
-                for notification in notifications:
-                    user_id = notification['user_id']
-                    message = notification['message']
-                    if notification['type'] == 'participant':
-                        await notify_participant(user_id, message)
-                    elif notification['type'] == 'winner':
-                        await notify_winner(user_id, message)
-            else:
-                logger.info("No notifications to send.")
-        except Exception as e:
-            logger.error(f"Error fetching notifications: {e}")
-
-    # Run tasks periodically
     while True:
         await fetch_and_post_announcements()
         await notify_participants_and_winners()
-        # Sleep for a while before running the tasks again (adjust as needed)
         await asyncio.sleep(60)
 
 if __name__ == '__main__':
