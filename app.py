@@ -34,6 +34,11 @@ class Giveaway(db.Model):
 with app.app_context():
     db.create_all()
 
+
+@app.route('/')
+def index():
+    return "Backend is running"
+
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
 def add_channel():
