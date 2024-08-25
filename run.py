@@ -87,6 +87,7 @@ def home():
     return render_template('home.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
+@app.route('/add_channel', methods=['POST'])
 def add_channel():
     channel_username = request.form.get('channel_username')
     try:
