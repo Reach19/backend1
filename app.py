@@ -3,11 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
 import random
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, CallbackContext
+import threading
+from telegram import Bot
 from telegram.error import TelegramError
 from flask_cors import CORS
-import asyncio
 
 # Configuration class for Flask and other services
 class Config:
@@ -24,7 +23,6 @@ CORS(app)
 
 # Initialize Telegram bot
 bot = Bot(token=app.config['TELEGRAM_API_TOKEN'])
-application = Application.builder().token(app.config['TELEGRAM_API_TOKEN']).build()
 
 # Database Models
 class User(db.Model):
@@ -61,24 +59,24 @@ class Participant(db.Model):
     date_joined = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Utility functions for the bot
-async def check_bot_admin(channel_username):
+def check_bot_admin(channel_username):
     try:
-        chat = await bot.get_chat(channel_username)
+        chat = bot.get_chat(channel_username)
         chat_id = chat.id
-        member = await bot.get_chat_member(chat_id, bot.id)
+        member = bot.get_chat_member(chat_id, bot.id)
         return chat_id, member.status in ['administrator', 'creator']
     except TelegramError as e:
         raise Exception(f"Error checking bot admin status: {str(e)}")
 
-async def post_to_channel(chat_id, message):
+def post_to_channel(chat_id, message):
     try:
-        await bot.send_message(chat_id=chat_id, text=message)
+        bot.send_message(chat_id=chat_id, text=message)
     except TelegramError as e:
         raise Exception(f"Error posting to channel: {str(e)}")
 
-async def post_winners_to_channel(chat_id, message):
+def post_winners_to_channel(chat_id, message):
     try:
-        await bot.send_message(chat_id=chat_id, text=message)
+        bot.send_message(chat_id=chat_id, text=message)
     except TelegramError as e:
         raise Exception(f"Error posting winners to channel: {str(e)}")
 
@@ -91,9 +89,9 @@ def home():
 def add_channel():
     channel_username = request.form.get('channel_username')
     try:
-        chat_id, bot_is_admin = asyncio.run(check_bot_admin(channel_username))
+        chat_id, bot_is_admin = check_bot_admin(channel_username)
         if bot_is_admin:
-            new_channel = Channel(username=channel_username, chat_id=chat_id, user_id=1)
+            new_channel = Channel(username=channel_username, chat_id=chat_id, user_id=1)  # Adjust user_id as needed
             db.session.add(new_channel)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Channel added successfully!'})
@@ -119,7 +117,7 @@ def create_giveaway():
             participant_count=participants_count,
             end_date=end_date,
             channel_id=selected_channel.id,
-            user_id=1
+            user_id=1  # Adjust as needed
         )
         db.session.add(new_giveaway)
         db.session.commit()
@@ -132,7 +130,7 @@ def create_giveaway():
             f"Join now and stand a chance to win!"
         )
         try:
-            asyncio.run(post_to_channel(selected_channel.chat_id, message))
+            post_to_channel(selected_channel.chat_id, message)
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to post giveaway to channel: {str(e)}'}), 500
         
@@ -161,40 +159,14 @@ def announce_winners(giveaway_id):
         f"View more details here: {giveaway.url}"
     )
     try:
-        asyncio.run(post_winners_to_channel(giveaway.channel_id, message))
+        post_winners_to_channel(giveaway.channel_id, message)
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to post winners to channel: {str(e)}'}), 500
 
     return jsonify({'success': True, 'winners': [{'username': winner.username} for winner in winners]})
 
-# Telegram Command Handlers
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Welcome to the Giveaway Bot!")
-
-async def create(update: Update, context: CallbackContext):
-    # Extract data from the message and create a giveaway
-    await update.message.reply_text("Giveaway created successfully!")
-
-async def join(update: Update, context: CallbackContext):
-    # Extract data from the message and join a giveaway
-    await update.message.reply_text("You have joined the giveaway!")
-
-application.add_handler(CommandHandler('start', start))
-application.add_handler(CommandHandler('create', create))
-application.add_handler(CommandHandler('join', join))
-
-# Run the Telegram bot asynchronously
-async def run_telegram_bot():
-    await application.start()
-    await application.idle()
-
 # Main application entry point
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Ensure all tables are created
-
-    # Run Flask and Telegram bot asynchronously
-    loop = asyncio.get_event_loop()
-    loop.create_task(run_telegram_bot())
     app.run(host='0.0.0.0', port=5000, debug=True)
-
