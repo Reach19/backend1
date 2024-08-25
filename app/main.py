@@ -1,52 +1,17 @@
 from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from app import db
+from app.models import User, Channel, Giveaway, Participant
 from datetime import datetime
 import random
-from bot import bot, check_bot_admin, post_to_channel, post_winners_to_channel
+from app.bot import check_bot_admin, post_to_channel, post_winners_to_channel
 
-# Initialize Flask app and database
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///giveaways.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key'
-db = SQLAlchemy(app)
-
-# Define models
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.String(50), unique=True, nullable=False)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    channels = db.relationship('Channel', backref='owner', lazy=True)
-    giveaways = db.relationship('Giveaway', backref='creator', lazy=True)
-
-class Channel(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    chat_id = db.Column(db.Integer, unique=True, nullable=False)
-    giveaways = db.relationship('Giveaway', backref='channel', lazy=True)
-
-class Giveaway(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    bot_username = db.Column(db.String(50), nullable=False)
-    amount = db.Column(db.Float, nullable=False)
-    participant_count = db.Column(db.Integer, nullable=False)
-    end_date = db.Column(db.DateTime, nullable=False)
-    posted = db.Column(db.Boolean, default=False)
-    winners = db.Column(db.PickleType, nullable=True)
-    channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    url = db.Column(db.String(200), nullable=True)
-
-class Participant(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    giveaway_id = db.Column(db.Integer, db.ForeignKey('giveaway.id'), nullable=False)
-    username = db.Column(db.String(50), nullable=False)
-    profile_pic = db.Column(db.String(200), nullable=False)
-    date_joined = db.Column(db.DateTime, default=datetime.utcnow)
+app.config.from_object('app.config.Config')
+db.init_app(app)
 
 @app.route('/')
 def home():
-    return 'Hello, this is the home page!'
+    return render_template('home.html', channels=Channel.query.all())
 
 @app.route('/add_channel', methods=['POST'])
 def add_channel():
@@ -80,7 +45,7 @@ def create_giveaway():
             participant_count=participants_count,
             end_date=end_date,
             channel_id=selected_channel.id,
-            user_id=1  # Placeholder, adjust as needed
+            user_id=1  # Adjust as needed
         )
         db.session.add(new_giveaway)
         db.session.commit()
@@ -131,6 +96,4 @@ def announce_winners(giveaway_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Ensure all tables are created
-    app.run(debug=True)
-
-
+    app.run(host='0.0.0.0', port=5000, debug=True)
