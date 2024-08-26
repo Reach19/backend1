@@ -16,10 +16,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
 
-# Defining the Channel and Giveaway models
+# Defining the User model
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.String(100), nullable=False, unique=True)
+    telegram_id = db.Column(db.String(100), nullable=False, unique=True)  # Store as String
 
 class Channel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +49,9 @@ def init_user():
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
 
+        # Ensure telegram_id is treated as a string
+        telegram_id = str(telegram_id)
+
         user = User.query.filter_by(telegram_id=telegram_id).first()
         if not user:
             user = User(telegram_id=telegram_id)
@@ -71,6 +74,9 @@ def add_channel():
         if not username or not user_id:
             return jsonify({'success': False, 'message': 'Missing username or user_id'}), 400
 
+        # Ensure user_id is treated as an integer
+        user_id = int(user_id)
+
         channel = Channel.query.filter_by(username=username, user_id=user_id).first()
         if channel:
             return jsonify({'success': False, 'message': 'Channel already exists.'}), 400
@@ -91,15 +97,19 @@ def get_user_channels():
 
         if not user_id:
             return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
-        
+
+        # Ensure user_id is treated as an integer
+        user_id = int(user_id)
+
         channels = Channel.query.filter_by(user_id=user_id).all()
         if not channels:
             return jsonify({'success': False, 'message': 'No channels found.'}), 404
-        
+
         channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
         return jsonify({'success': True, 'channels': channel_list})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Endpoint to create a giveaway
 @app.route('/create_giveaway', methods=['POST'])
