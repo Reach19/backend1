@@ -58,7 +58,7 @@ def add_channel():
         return jsonify({'success': True, 'message': 'Channel added successfully!'})
     except IntegrityError:
         db.session.rollback()
-        return jsonify({'success': False, 'message': 'Integrity error occurred.'}), 400
+        return jsonify({'success': False, 'message': 'Integrity error occurred: Duplicate channel.'}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -107,6 +107,9 @@ def create_giveaway():
             return jsonify({'success': False, 'message': 'Channel not found'}), 404
 
         bot_token = os.getenv('TELEGRAM_API_TOKEN')
+        if not bot_token:
+            return jsonify({'success': False, 'message': 'Telegram API token is not configured'}), 500
+        
         send_message_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
         
         message = (f"🎉 New Giveaway! 🎉\n\n"
@@ -128,4 +131,3 @@ def create_giveaway():
 # Run the Flask app
 if __name__ == '__main__':
     app.run()
-
