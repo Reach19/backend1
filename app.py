@@ -4,7 +4,6 @@ from sqlalchemy.exc import IntegrityError
 from flask_cors import CORS
 from flask_migrate import Migrate
 import os
-import requests
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -12,7 +11,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Configuring the SQLAlchemy Database URI and initializing the database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.elaqzrcvbknbzvbkdwgp:iCcxsx4TpDLdwqzq@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
@@ -47,25 +45,7 @@ def add_channel():
         if not username or not creator_id:
             return jsonify({'success': False, 'message': 'Missing username or creator_id'}), 400
 
-        # Check if the bot is an admin in the channel
-        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
-        if not bot_token:
-            return jsonify({'success': False, 'message': 'Bot token is missing.'}), 500
-
-        bot_user_id = bot_token.split(':')[0]  # Extract the bot user ID from the token
-        chat_member_url = f'https://api.telegram.org/bot{bot_token}/getChatMember'
-        response = requests.get(chat_member_url, params={
-            'chat_id': f'@{username}',
-            'user_id': bot_user_id
-        })
-
-        if response.status_code != 200:
-            return jsonify({'success': False, 'message': 'Failed to verify bot status in the channel.'}), 500
-
-        chat_member_data = response.json().get('result', {})
-        if 'administrator' not in chat_member_data.get('status', ''):
-            return jsonify({'success': False, 'message': 'Bot is not an admin in the channel'}), 403
-
+        # Skipping the bot admin check
         channel = Channel(username=username, creator_id=creator_id)
         db.session.add(channel)
         db.session.commit()
@@ -102,9 +82,6 @@ def create_giveaway():
         end_date = data.get('end_date')
         channel_id = data.get('channel_id')
         creator_id = data.get('creator_id')
-
-        if not name or not prize_amount or not participants_count or not end_date or not channel_id or not creator_id:
-            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
         giveaway = Giveaway(name=name, prize_amount=prize_amount, participants_count=participants_count,
                             end_date=end_date, channel_id=channel_id, creator_id=creator_id)
