@@ -17,10 +17,14 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
 
 # Defining the Channel and Giveaway models
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    telegram_id = db.Column(db.String(100), nullable=False, unique=True)
+
 class Channel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), nullable=False, unique=True)
-    creator_id = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 class Giveaway(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,11 +33,32 @@ class Giveaway(db.Model):
     participants_count = db.Column(db.Integer, nullable=False)
     end_date = db.Column(db.DateTime, nullable=False)
     channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'), nullable=False)
-    creator_id = db.Column(db.String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-@app.route('/')
-def index():
-    return "Backend is running"
+class Participant(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    telegram_id = db.Column(db.String(100), nullable=False)
+    giveaway_id = db.Column(db.Integer, db.ForeignKey('giveaway.id'), nullable=False)
+
+@app.route('/init_user', methods=['POST'])
+def init_user():
+    try:
+        data = request.get_json()
+        telegram_id = data.get('telegram_id')
+
+        if not telegram_id:
+            return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
+
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+        if not user:
+            user = User(telegram_id=telegram_id)
+            db.session.add(user)
+            db.session.commit()
+
+        return jsonify({'success': True, 'user_id': user.id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
@@ -41,38 +66,35 @@ def add_channel():
     try:
         data = request.get_json()
         username = data.get('username')
-        creator_id = data.get('creator_id')
+        user_id = data.get('user_id')
 
-        if not username or not creator_id:
-            return jsonify({'success': False, 'message': 'Missing username or creator_id'}), 400
+        if not username or not user_id:
+            return jsonify({'success': False, 'message': 'Missing username or user_id'}), 400
 
-        # Check if the channel already exists
-        existing_channel = Channel.query.filter_by(username=username).first()
-        if existing_channel:
-            return jsonify({'success': False, 'message': 'Channel already exists'}), 400
+        channel = Channel.query.filter_by(username=username, user_id=user_id).first()
+        if channel:
+            return jsonify({'success': False, 'message': 'Channel already exists.'}), 400
 
-        # Add new channel
-        channel = Channel(username=username, creator_id=creator_id)
+        channel = Channel(username=username, user_id=user_id)
         db.session.add(channel)
         db.session.commit()
+
         return jsonify({'success': True, 'message': 'Channel added successfully!'})
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': 'Integrity error occurred: Duplicate channel.'}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # Endpoint to get channels for a specific creator
-@app.route('/get_channels', methods=['GET'])
-def get_channels():
+@app.route('/get_user_channels', methods=['GET'])
+def get_user_channels():
     try:
-        creator_id = request.args.get('creator_id')
-        if not creator_id:
-            return jsonify({'success': False, 'message': 'Missing creator_id parameter'}), 400
+        user_id = request.args.get('user_id')
+
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
         
-        channels = Channel.query.filter_by(creator_id=creator_id).all()
+        channels = Channel.query.filter_by(user_id=user_id).all()
         if not channels:
-            return jsonify({'success': False, 'message': 'No channels found'}), 404
+            return jsonify({'success': False, 'message': 'No channels found.'}), 404
         
         channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
         return jsonify({'success': True, 'channels': channel_list})
@@ -90,13 +112,13 @@ def create_giveaway():
         participants_count = data.get('participants_count')
         end_date = data.get('end_date')
         channel_id = data.get('channel_id')
-        creator_id = data.get('creator_id')
+        user_id = data.get('user_id')
 
-        if not name or not prize_amount or not participants_count or not end_date or not channel_id or not creator_id:
-            return jsonify({'success': False, 'message': 'All fields are required.'}), 400
+        if not name or not prize_amount or not participants_count or not end_date or not channel_id or not user_id:
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
         giveaway = Giveaway(name=name, prize_amount=prize_amount, participants_count=participants_count,
-                            end_date=end_date, channel_id=channel_id, creator_id=creator_id)
+                            end_date=end_date, channel_id=channel_id, user_id=user_id)
         
         db.session.add(giveaway)
         db.session.commit()
