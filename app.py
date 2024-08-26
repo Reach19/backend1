@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from flask_cors import CORS
 from flask_migrate import Migrate
 import os
+import requests
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -45,14 +46,19 @@ def add_channel():
         if not username or not creator_id:
             return jsonify({'success': False, 'message': 'Missing username or creator_id'}), 400
 
-        # Skipping the bot admin check
+        # Check if the channel already exists
+        existing_channel = Channel.query.filter_by(username=username).first()
+        if existing_channel:
+            return jsonify({'success': False, 'message': 'Channel already exists'}), 400
+
+        # Add new channel
         channel = Channel(username=username, creator_id=creator_id)
         db.session.add(channel)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Channel added successfully!'})
     except IntegrityError:
         db.session.rollback()
-        return jsonify({'success': False, 'message': 'Channel already exists or another error occurred.'}), 400
+        return jsonify({'success': False, 'message': 'Integrity error occurred.'}), 400
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -65,6 +71,9 @@ def get_channels():
             return jsonify({'success': False, 'message': 'Missing creator_id parameter'}), 400
         
         channels = Channel.query.filter_by(creator_id=creator_id).all()
+        if not channels:
+            return jsonify({'success': False, 'message': 'No channels found'}), 404
+        
         channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
         return jsonify({'success': True, 'channels': channel_list})
     except Exception as e:
@@ -83,6 +92,9 @@ def create_giveaway():
         channel_id = data.get('channel_id')
         creator_id = data.get('creator_id')
 
+        if not name or not prize_amount or not participants_count or not end_date or not channel_id or not creator_id:
+            return jsonify({'success': False, 'message': 'All fields are required.'}), 400
+
         giveaway = Giveaway(name=name, prize_amount=prize_amount, participants_count=participants_count,
                             end_date=end_date, channel_id=channel_id, creator_id=creator_id)
         
@@ -91,6 +103,9 @@ def create_giveaway():
 
         # Send giveaway announcement to the channel
         channel = Channel.query.get(channel_id)
+        if not channel:
+            return jsonify({'success': False, 'message': 'Channel not found'}), 404
+
         bot_token = os.getenv('TELEGRAM_API_TOKEN')
         send_message_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
         
@@ -113,3 +128,4 @@ def create_giveaway():
 # Run the Flask app
 if __name__ == '__main__':
     app.run()
+
