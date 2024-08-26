@@ -50,11 +50,11 @@ def init_user():
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
 
         # Ensure telegram_id is treated as a string
-        telegram_id = str(telegram_id)
+        telegram_id_str = str(telegram_id)
 
-        user = User.query.filter_by(telegram_id=telegram_id).first()
+        user = User.query.filter_by(telegram_id=telegram_id_str).first()
         if not user:
-            user = User(telegram_id=telegram_id)
+            user = User(telegram_id=telegram_id_str)
             db.session.add(user)
             db.session.commit()
 
