@@ -15,6 +15,8 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+BOT_SERVICE_URL = 'botbackend-production.up.railway.app'
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
 
@@ -74,7 +76,6 @@ def add_winner_notification(user_id, giveaway_name):
 # Additional function to announce the giveaway
 def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
     try:
-        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
         join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id}'
         message = (f"🎉 New Giveaway Alert! 🎉\n\n"
                    f"Name: {giveaway_name}\n"
@@ -82,17 +83,22 @@ def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
                    f"Ends on: {end_date}\n\n"
                    f"Join here: {join_url}")
         
-        # Use channel's username (if available) or numeric chat_id
-        channel = Channel.query.get(channel_id)
-        chat_identifier = f'@{channel.username}' if channel.username else channel.chat_id
-
+        # Sending a request to the bot.py service to post the message
         response = requests.post(
-            f'https://api.telegram.org/bot{bot_token}/sendMessage',
-            data={'chat_id': chat_identifier, 'text': message}
+            f"{BOT_SERVICE_URL}/post_announcement",
+            json={
+                'channel_username': channel_username,
+                'message': message
+            }
         )
-        response.raise_for_status()
+        
+        if response.status_code == 200:
+            return jsonify({'success': True, 'message': 'Giveaway announced!'})
+        else:
+            return jsonify({'success': False, 'message': f"Failed to announce giveaway: {response.text}"}), 500
+    
     except Exception as e:
-        print(f"Error announcing giveaway: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/init_user', methods=['POST'])
@@ -195,34 +201,13 @@ def create_giveaway():
         channel = Channel.query.get(channel_id)
         if not channel:
             return jsonify({'success': False, 'message': 'Channel not found'}), 404
-
-        bot_token = "7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8"
-        if not bot_token:
-            return jsonify({'success': False, 'message': 'Telegram API token is not configured'}), 500
-
-        send_message_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
-        
-        message = (f"🎉 New Giveaway! 🎉\n\n"
-                   f"Name: {name}\n"
-                   f"Prize: ${prize_amount}\n"
-                   f"Participants: {participants_count}\n"
-                   f"Ends on: {end_date}\n\n"
-                   f"Join now to win!")
-
-        # Modify to use channel ID if necessary
-        response = requests.post(send_message_url, data={
-            'chat_id': f'@{channel.username}',  # or use 'chat_id': channel_id if numeric ID
-            'text': message
-        })
-
-        # Check if the request was successful
-        if response.status_code != 200:
-            return jsonify({'success': False, 'message': f"Failed to send message: {response.text}"}), 500
+        # Announce the giveaway
+        announce_giveaway(channel.username, giveaway.id, name, prize_amount, end_date)
 
         return jsonify({'success': True, 'message': 'Giveaway created and announced!'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-
+        
 # Endpoint to handle joining a giveaway
 @app.route('/join_giveaway', methods=['POST'])
 def join_giveaway():
