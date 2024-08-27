@@ -42,6 +42,53 @@ class Participant(db.Model):
     telegram_id = db.Column(db.String(100), nullable=False)
     giveaway_id = db.Column(db.Integer, db.ForeignKey('giveaway.id'), nullable=False)
 
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # 'participant' or 'winner'
+    sent = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+def add_participant_notification(user_id, giveaway_name):
+    notification = Notification(
+        user_id=user_id,
+        message=f"You have successfully joined the giveaway: {giveaway_name}",
+        type='participant'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+# Function to add a winner notification
+def add_winner_notification(user_id, giveaway_name):
+    notification = Notification(
+        user_id=user_id,
+        message=f"Congratulations! You are one of the winners of the giveaway: {giveaway_name}",
+        type='winner'
+    )
+    db.session.add(notification)
+    db.session.commit()
+
+# Additional function to announce the giveaway
+def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
+    try:
+        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
+        join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id}'
+        message = (f"🎉 New Giveaway Alert! 🎉\n\n"
+                   f"Name: {giveaway_name}\n"
+                   f"Prize: ${prize}\n"
+                   f"Ends on: {end_date}\n\n"
+                   f"Join here: {join_url}")
+        
+        response = requests.post(
+            f'https://api.telegram.org/bot{bot_token}/sendMessage',
+            data={'chat_id': channel_id, 'text': message}
+        )
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Error announcing giveaway: {e}")
+
+
 @app.route('/init_user', methods=['POST'])
 def init_user():
     try:
@@ -191,24 +238,56 @@ def join_giveaway():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# Additional function to announce the giveaway
-def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
+
+
+@app.route('/get_giveaway_announcements', methods=['GET'])
+def get_giveaway_announcements():
     try:
-        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
-        join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id}'
-        message = (f"🎉 New Giveaway Alert! 🎉\n\n"
-                   f"Name: {giveaway_name}\n"
-                   f"Prize: ${prize}\n"
-                   f"Ends on: {end_date}\n\n"
-                   f"Join here: {join_url}")
-        
-        response = requests.post(
-            f'https://api.telegram.org/bot{bot_token}/sendMessage',
-            data={'chat_id': channel_id, 'text': message}
-        )
-        response.raise_for_status()
+        current_time = datetime.now()
+        # Assuming Giveaway has a 'announced' flag to track if it's announced
+        pending_announcements = Giveaway.query.filter_by(announced=False).filter(Giveaway.end_date > current_time).all()
+
+        announcements = []
+        for giveaway in pending_announcements:
+            channel_id = giveaway.channel_id
+            message = f"🎉 New Giveaway: {giveaway.name}\nPrize: {giveaway.prize_amount}\nEnds: {giveaway.end_date}"
+            
+            # Add to the list of announcements
+            announcements.append({
+                'channel_id': channel_id,
+                'message': message
+            })
+            
+            # Mark the giveaway as announced
+            giveaway.announced = True
+            db.session.commit()
+
+        return jsonify({'success': True, 'announcements': announcements})
     except Exception as e:
-        print(f"Error announcing giveaway: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/get_pending_notifications', methods=['GET'])
+def get_pending_notifications():
+    try:
+        # Assuming you have a Notifications model to track messages that need to be sent
+        pending_notifications = Notifications.query.filter_by(sent=False).all()
+
+        notifications = []
+        for notification in pending_notifications:
+            notifications.append({
+                'user_id': notification.user_id,
+                'message': notification.message,
+                'type': notification.type  # 'participant' or 'winner'
+            })
+            
+            # Mark the notification as sent
+            notification.sent = True
+            db.session.commit()
+
+        return jsonify({'success': True, 'notifications': notifications})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 @app.route('/select_winners', methods=['POST'])
 def select_winners():
