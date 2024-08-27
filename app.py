@@ -5,6 +5,8 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 import os
 import requests
+import random
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -160,6 +162,103 @@ def create_giveaway():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+# Endpoint to handle joining a giveaway
+@app.route('/join_giveaway', methods=['POST'])
+def join_giveaway():
+    try:
+        data = request.get_json()
+        telegram_id = data.get('telegram_id')
+        giveaway_id = data.get('giveaway_id')
+
+        if not telegram_id or not giveaway_id:
+            return jsonify({'success': False, 'message': 'Missing telegram_id or giveaway_id'}), 400
+
+        telegram_id_str = str(telegram_id)
+        giveaway_id_int = int(giveaway_id)
+
+        participant = Participant.query.filter_by(telegram_id=telegram_id_str, giveaway_id=giveaway_id_int).first()
+        if participant:
+            return jsonify({'success': False, 'message': 'Already joined this giveaway'}), 400
+
+        participant = Participant(telegram_id=telegram_id_str, giveaway_id=giveaway_id_int)
+        db.session.add(participant)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Successfully joined the giveaway!'})
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'You have already joined this giveaway.'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# Additional function to announce the giveaway
+def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
+    try:
+        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
+        join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id}'
+        message = (f"🎉 New Giveaway Alert! 🎉\n\n"
+                   f"Name: {giveaway_name}\n"
+                   f"Prize: ${prize}\n"
+                   f"Ends on: {end_date}\n\n"
+                   f"Join here: {join_url}")
+        
+        response = requests.post(
+            f'https://api.telegram.org/bot{bot_token}/sendMessage',
+            data={'chat_id': channel_id, 'text': message}
+        )
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Error announcing giveaway: {e}")
+
+@app.route('/select_winners', methods=['POST'])
+def select_winners():
+    try:
+        data = request.get_json()
+        giveaway_id = data.get('giveaway_id')
+
+        if not giveaway_id:
+            return jsonify({'success': False, 'message': 'Missing giveaway_id'}), 400
+
+        giveaway_id_int = int(giveaway_id)
+        giveaway = Giveaway.query.get(giveaway_id_int)
+
+        if not giveaway:
+            return jsonify({'success': False, 'message': 'Giveaway not found'}), 404
+
+        # Ensure the giveaway has ended
+        if giveaway.end_date > datetime.now():
+            return jsonify({'success': False, 'message': 'Giveaway is not yet ended'}), 400
+
+        participants = Participant.query.filter_by(giveaway_id=giveaway_id_int).all()
+        if not participants:
+            return jsonify({'success': False, 'message': 'No participants found'}), 404
+
+        # Randomly select winners
+        winner_count = min(giveaway.participants_count, len(participants))
+        winners = random.sample(participants, winner_count)
+
+        # Announce winners
+        channel = Channel.query.get(giveaway.channel_id)
+        if not channel:
+            return jsonify({'success': False, 'message': 'Channel not found'}), 404
+
+        bot_token = '7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8'
+        join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id_int}'
+        winner_text = "\n".join([f"Winner: {p.telegram_id}" for p in winners])
+        message = (f"🏆 Giveaway Winners! 🏆\n\n"
+                   f"{winner_text}\n\n"
+                   f"Thank you all for participating! Stay tuned for more giveaways.\n\n"
+                   f"Join our bot: {join_url}")
+
+        send_message_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+        requests.post(send_message_url, data={
+            'chat_id': f'@{channel.username}',
+            'text': message
+        })
+
+        return jsonify({'success': True, 'message': 'Winners selected and announced!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 # Run the Flask app
 if __name__ == '__main__':
     app.run()
