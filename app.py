@@ -37,6 +37,7 @@ class Giveaway(db.Model):
     end_date = db.Column(db.DateTime, nullable=False)
     channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    announced = db.Column(db.Boolean, default=False) 
 
 class Participant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -119,19 +120,22 @@ def add_channel():
     try:
         data = request.get_json()
         username = data.get('username')
+        chat_id = data.get('chat_id')  # New field for numeric chat_id
         user_id = data.get('user_id')
 
-        if not username or not user_id:
-            return jsonify({'success': False, 'message': 'Missing username or user_id'}), 400
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Missing user_id'}), 400
 
-        # Ensure user_id is treated as an integer
+        # Convert user_id to integer
         user_id = int(user_id)
 
-        channel = Channel.query.filter_by(username=username, user_id=user_id).first()
-        if channel:
+        # Check for existing channel
+        existing_channel = Channel.query.filter_by(username=username, user_id=user_id).first() if username else Channel.query.filter_by(chat_id=chat_id, user_id=user_id).first()
+        if existing_channel:
             return jsonify({'success': False, 'message': 'Channel already exists.'}), 400
 
-        channel = Channel(username=username, user_id=user_id)
+        # Create new channel
+        channel = Channel(username=username, chat_id=chat_id, user_id=user_id)
         db.session.add(channel)
         db.session.commit()
 
@@ -178,7 +182,7 @@ def create_giveaway():
             return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
         giveaway = Giveaway(name=name, prize_amount=prize_amount, participants_count=participants_count,
-                            end_date=end_date, channel_id=channel_id, user_id=user_id)
+                            end_date=end_date, channel_id=channel_id, user_id=user_id, announced=False)
         
         db.session.add(giveaway)
         db.session.commit()

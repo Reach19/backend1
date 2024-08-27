@@ -27,10 +27,10 @@ async def notify_winner(user_id: int, message: str) -> None:
     except Exception as e:
         logger.error(f"Error sending message to user {user_id}: {e}")
 
-async def post_giveaway_announcement(channel_id: int, message: str) -> None:
+async def post_giveaway_announcement(channel_id: str, message: str) -> None:
     try:
         bot = Bot(token=TELEGRAM_API_TOKEN)
-        await bot.send_message(chat_id=channel_id, text=message)
+        await bot.send_message(chat_id=channel_id, text=message, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Error posting message to channel {channel_id}: {e}")
 
@@ -70,13 +70,10 @@ async def notify_participants_and_winners():
         logger.error(f"Error fetching notifications: {e}")
 
 async def main() -> None:
-    application = Application.builder().token(TELEGRAM_API_TOKEN).build()
-    
     while True:
         await fetch_and_post_announcements()
         await notify_participants_and_winners()
-        await asyncio.sleep(5)
+        await asyncio.sleep(60)  # Wait for 60 seconds before the next check
 
 if __name__ == '__main__':
-    import asyncio
     asyncio.run(main())
