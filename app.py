@@ -83,11 +83,21 @@ def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
                    f"Ends on: {end_date}\n\n"
                    f"Join here: {join_url}")
         
+        user_id = request.args.get('user_id')
+
+        if not user_id:
+            return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
+
+        # Ensure user_id is treated as an integer
+        user_id = int(user_id)
+
+        channels = Channel.query.filter_by(user_id=user_id).all()
+
         # Sending a request to the bot.py service to post the message
         response = requests.post(
             f"{BOT_SERVICE_URL}/post_announcement",
             json={
-                'channel_id': channel_id,
+                'channel_id': channels,
                 'message': message
             }
         )
