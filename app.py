@@ -87,7 +87,7 @@ def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
         response = requests.post(
             f"{BOT_SERVICE_URL}/post_announcement",
             json={
-                'channel_username': channel_username,
+                'channel_id': channel_id,
                 'message': message
             }
         )
