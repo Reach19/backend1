@@ -75,7 +75,7 @@ async def main() -> None:
     while True:
         await fetch_and_post_announcements()
         await notify_participants_and_winners()
-        await asyncio.sleep(60)
+        await asyncio.sleep(5)
 
 if __name__ == '__main__':
     import asyncio

@@ -25,7 +25,8 @@ class User(db.Model):
 
 class Channel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=True)  # Optional for public channels
+    chat_id = db.Column(db.BigInteger, nullable=True)   # Required for private channels
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 class Giveaway(db.Model):
