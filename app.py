@@ -82,9 +82,13 @@ def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
                    f"Ends on: {end_date}\n\n"
                    f"Join here: {join_url}")
         
+        # Use channel's username (if available) or numeric chat_id
+        channel = Channel.query.get(channel_id)
+        chat_identifier = f'@{channel.username}' if channel.username else channel.chat_id
+
         response = requests.post(
             f'https://api.telegram.org/bot{bot_token}/sendMessage',
-            data={'chat_id': channel_id, 'text': message}
+            data={'chat_id': chat_identifier, 'text': message}
         )
         response.raise_for_status()
     except Exception as e:

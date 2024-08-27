@@ -30,7 +30,9 @@ async def notify_winner(user_id: int, message: str) -> None:
 async def post_giveaway_announcement(channel_id: str, message: str) -> None:
     try:
         bot = Bot(token=TELEGRAM_API_TOKEN)
-        await bot.send_message(chat_id=channel_id, text=message, parse_mode='Markdown')
+        # If channel_id is not numeric, assume it's a username and prepend '@'
+        chat_identifier = channel_id if channel_id.isnumeric() else f'@{channel_id}'
+        await bot.send_message(chat_id=chat_identifier, text=message, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Error posting message to channel {channel_id}: {e}")
 
