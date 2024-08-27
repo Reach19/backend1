@@ -140,7 +140,7 @@ def create_giveaway():
         if not channel:
             return jsonify({'success': False, 'message': 'Channel not found'}), 404
 
-        bot_token = os.getenv('TELEGRAM_API_TOKEN')
+        bot_token = "7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8"
         if not bot_token:
             return jsonify({'success': False, 'message': 'Telegram API token is not configured'}), 500
         
