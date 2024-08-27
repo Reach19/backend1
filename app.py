@@ -190,7 +190,7 @@ def create_giveaway():
         bot_token = "7514207604:AAE_p_eFFQ3yOoNn-GSvTSjte2l8UEHl7b8"
         if not bot_token:
             return jsonify({'success': False, 'message': 'Telegram API token is not configured'}), 500
-        
+
         send_message_url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
         
         message = (f"🎉 New Giveaway! 🎉\n\n"
@@ -200,10 +200,15 @@ def create_giveaway():
                    f"Ends on: {end_date}\n\n"
                    f"Join now to win!")
 
-        requests.post(send_message_url, data={
-            'chat_id': f'@{channel.username}',
+        # Modify to use channel ID if necessary
+        response = requests.post(send_message_url, data={
+            'chat_id': f'@{channel.username}',  # or use 'chat_id': channel_id if numeric ID
             'text': message
         })
+
+        # Check if the request was successful
+        if response.status_code != 200:
+            return jsonify({'success': False, 'message': f"Failed to send message: {response.text}"}), 500
 
         return jsonify({'success': True, 'message': 'Giveaway created and announced!'})
     except Exception as e:
