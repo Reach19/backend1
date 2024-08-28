@@ -15,7 +15,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-BOT_SERVICE_URL = 'https://botbackend-production.up.railway.app'
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
@@ -73,42 +72,6 @@ def add_winner_notification(user_id, giveaway_name):
     db.session.add(notification)
     db.session.commit()
 
-# Additional function to announce the giveaway
-def announce_giveaway(channel_id, giveaway_id, giveaway_name, prize, end_date):
-    try:
-        join_url = f'https://t.me/giveaway_setota_bot/Giveaway?giveaway_id={giveaway_id}'
-        message = (f"🎉 New Giveaway Alert! 🎉\n\n"
-                   f"Name: {giveaway_name}\n"
-                   f"Prize: ${prize}\n"
-                   f"Ends on: {end_date}\n\n"
-                   f"Join here: {join_url}")
-        
-        user_id = request.args.get('user_id')
-
-        if not user_id:
-            return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
-
-        # Ensure user_id is treated as an integer
-        user_id = int(user_id)
-
-        channels = Channel.query.filter_by(user_id=user_id).all()
-
-        # Sending a request to the bot.py service to post the message
-        response = requests.post(
-            f"{BOT_SERVICE_URL}/post_announcement",
-            json={
-                'channel_id': channels,
-                'message': message
-            }
-        )
-        
-        if response.status_code == 200:
-            return jsonify({'success': True, 'message': 'Giveaway announced!'})
-        else:
-            return jsonify({'success': False, 'message': f"Failed to announce giveaway: {response.text}"}), 500
-    
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/init_user', methods=['POST'])
@@ -207,14 +170,6 @@ def create_giveaway():
         db.session.add(giveaway)
         db.session.commit()
 
-        # Send giveaway announcement to the channel
-        channel = Channel.query.get(channel_id)
-        if not channel:
-            return jsonify({'success': False, 'message': 'Channel not found'}), 404
-        # Announce the giveaway
-        announce_giveaway(channel.username, giveaway.id, name, prize_amount, end_date)
-
-        return jsonify({'success': True, 'message': 'Giveaway created and announced!'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
         
