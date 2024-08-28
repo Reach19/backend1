@@ -56,6 +56,7 @@ class Notification(db.Model):
 
 # Define the Winner model
 class Winner(db.Model):
+    __tablename__ = 'winner'
     id = db.Column(db.Integer, primary_key=True)
     giveaway_id = db.Column(db.Integer, db.ForeignKey('giveaway.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
