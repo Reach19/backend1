@@ -4,12 +4,11 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from datetime import datetime
 import random
-import os
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Configuring the SQLAlchemy Database URI and initializing the databasepostgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+# Configuring the SQLAlchemy Database URI and initializing the database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -19,7 +18,7 @@ migrate = Migrate(app, db)  # Initialize Flask-Migrate
 # Define the User model
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.String(100), nullable=False, unique=True)
+    telegram_id = db.Column(db.BigInteger, nullable=False, unique=True)  # Changed to BigInteger
 
 # Define the Channel model
 class Channel(db.Model):
@@ -81,15 +80,17 @@ def init_user():
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
 
-        user = User.query.filter_by(telegram_id=telegram_id).first()
+        # Convert the telegram_id to an integer before querying the database
+        user = User.query.filter_by(telegram_id=int(telegram_id)).first()
         if not user:
-            user = User(telegram_id=telegram_id)
+            user = User(telegram_id=int(telegram_id))
             db.session.add(user)
             db.session.commit()
 
         return jsonify({'success': True, 'user_id': user.id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
