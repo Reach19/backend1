@@ -18,7 +18,7 @@ migrate = Migrate(app, db)  # Initialize Flask-Migrate
 # Define the User model
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.BigInteger, nullable=False, unique=True)  # Changed to BigInteger
+    telegram_id = db.Column(db.Text, nullable=False, unique=True)
 
 # Define the Channel model
 class Channel(db.Model):
@@ -75,22 +75,20 @@ def add_notification(user_id, message, notif_type):
 def init_user():
     try:
         data = request.get_json()
-        telegram_id = str(data.get('telegram_id')) 
+        telegram_id = str(data.get('telegram_id'))  # Ensure it's treated as a string
 
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
 
-        # Convert the telegram_id to an integer before querying the database
-        user = User.query.filter_by(telegram_id=int(telegram_id)).first()
+        user = User.query.filter_by(telegram_id=telegram_id).first()
         if not user:
-            user = User(telegram_id=int(telegram_id))
+            user = User(telegram_id=telegram_id)
             db.session.add(user)
             db.session.commit()
 
         return jsonify({'success': True, 'user_id': user.id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-
 
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
