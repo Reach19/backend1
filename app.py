@@ -90,7 +90,7 @@ def init_user():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# Endpoint to add a channel 
+# Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
 def add_channel():
     try:
