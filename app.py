@@ -75,7 +75,7 @@ def add_notification(user_id, message, notif_type):
 def init_user():
     try:
         data = request.get_json()
-        telegram_id = data.get('telegram_id')
+        telegram_id = str(data.get('telegram_id')) 
 
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
