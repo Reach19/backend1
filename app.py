@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 from flask_cors import CORS
 from flask_migrate import Migrate
 from datetime import datetime
@@ -168,32 +169,39 @@ def create_giveaway():
 # Endpoint to join a giveaway
 @app.route('/join_giveaway', methods=['POST'])
 def join_giveaway():
+
     try:
         data = request.get_json()
+        print(f"Received data: {data}")
         telegram_id = data.get('telegram_id')
         giveaway_id = data.get('giveaway_id')
-
+    
         if not telegram_id or not giveaway_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id or giveaway_id'}), 400
-
+    
         user = User.query.filter_by(telegram_id=telegram_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
-
+    
         participant = Participant.query.filter_by(user_id=user.id, giveaway_id=giveaway_id).first()
         if participant:
             return jsonify({'success': False, 'message': 'Already joined this giveaway'}), 400
-
+    
         participant = Participant(user_id=user.id, giveaway_id=giveaway_id)
         db.session.add(participant)
         db.session.commit()
-
+    
         add_notification(user.id, f"You have successfully joined the giveaway: {Giveaway.query.get(giveaway_id).name}", 'participant')
-
+    
         return jsonify({'success': True, 'message': 'Successfully joined the giveaway!'})
+    
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': 'Database error occurred: ' + str(e)}), 500
+    
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
+        return jsonify({'success': False, 'message': 'Unexpected error: ' + str(e)}), 500
+    
 # Function to select winners
 def select_winners(giveaway_id, number_of_winners):
     giveaway = Giveaway.query.get(giveaway_id)
