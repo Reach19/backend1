@@ -19,13 +19,13 @@ migrate = Migrate(app, db)  # Initialize Flask-Migrate
 # Define the User model
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.Text, nullable=False, unique=True)
+    telegram_id = db.Column(db.Text, nullable=False, unique=True)  # Ensure this is TEXT
 
 # Define the Channel model
 class Channel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), nullable=True)  # Optional for public channels
-    chat_id = db.Column(db.BigInteger, nullable=True)  # Required for private channels
+    username = db.Column(db.String(100), nullable=True)
+    chat_id = db.Column(db.BigInteger, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 # Define the Giveaway model
@@ -50,7 +50,7 @@ class Notification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     message = db.Column(db.String(500), nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # 'participant' or 'winner'
+    type = db.Column(db.String(50), nullable=False)
     sent = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -76,7 +76,7 @@ def add_notification(user_id, message, notif_type):
 def init_user():
     try:
         data = request.get_json()
-        telegram_id = str(data.get('telegram_id'))  # Ensure it's treated as a string
+        telegram_id = str(data.get('telegram_id'))  # Force it to be a string
 
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
@@ -90,6 +90,7 @@ def init_user():
         return jsonify({'success': True, 'user_id': user.id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
@@ -169,38 +170,35 @@ def create_giveaway():
 # Endpoint to join a giveaway
 @app.route('/join_giveaway', methods=['POST'])
 def join_giveaway():
-
     try:
         data = request.get_json()
-        print(f"Received data: {data}")
-        telegram_id = data.get('telegram_id')
+        telegram_id = str(data.get('telegram_id'))  # Convert to string
         giveaway_id = data.get('giveaway_id')
-    
+
         if not telegram_id or not giveaway_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id or giveaway_id'}), 400
-    
+
         user = User.query.filter_by(telegram_id=telegram_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
-    
+
         participant = Participant.query.filter_by(user_id=user.id, giveaway_id=giveaway_id).first()
         if participant:
             return jsonify({'success': False, 'message': 'Already joined this giveaway'}), 400
-    
+
         participant = Participant(user_id=user.id, giveaway_id=giveaway_id)
         db.session.add(participant)
         db.session.commit()
-    
+
         add_notification(user.id, f"You have successfully joined the giveaway: {Giveaway.query.get(giveaway_id).name}", 'participant')
-    
+
         return jsonify({'success': True, 'message': 'Successfully joined the giveaway!'})
-    
     except SQLAlchemyError as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': 'Database error occurred: ' + str(e)}), 500
-    
     except Exception as e:
         return jsonify({'success': False, 'message': 'Unexpected error: ' + str(e)}), 500
+
     
 # Function to select winners
 def select_winners(giveaway_id, number_of_winners):
