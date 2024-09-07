@@ -3,7 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 from flask_cors import CORS
 from flask_migrate import Migrate
-from datetime import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
 import random
 
 app = Flask(__name__)
@@ -246,22 +247,59 @@ def check_and_send_notifications():
         giveaway.announced = True
         db.session.commit()
 
-# Endpoint to fetch user notifications
-@app.route('/user_notifications', methods=['GET'])
-def user_notifications():
-    try:
-        user_id = request.args.get('user_id')
+# Function to select winners
+def select_winners(giveaway_id, number_of_winners):
+    giveaway = Giveaway.query.get(giveaway_id)
+    if not giveaway:
+        return {"error": "Giveaway not found"}
 
-        if not user_id:
-            return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
+    participants = Participant.query.filter_by(giveaway_id=giveaway_id).all()
+    if len(participants) < number_of_winners:
+        return {"error": "Not enough participants"}
 
-        notifications = Notification.query.filter_by(user_id=user_id).order_by(Notification.created_at.desc()).all()
+    selected_winners = random.sample(participants, number_of_winners)
+    winner_ids = []
 
-        notification_list = [{'id': notif.id, 'message': notif.message, 'type': notif.type, 'sent': notif.sent} for notif in notifications]
+    for participant in selected_winners:
+        winner = Winner(giveaway_id=giveaway.id, user_id=participant.user_id)
+        db.session.add(winner)
+        winner_ids.append(participant.user_id)
 
-        return jsonify({'success': True, 'notifications': notification_list})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+        # Add a notification for the winner
+        add_notification(participant.user_id, f"Congratulations! You have won the giveaway: {giveaway.name}", 'winner')
+
+    db.session.commit()
+    return {"success": True, "winner_ids": winner_ids}
+
+# Function to check and process ended giveaways
+def process_ended_giveaways():
+    now = datetime.utcnow()
+    giveaways = Giveaway.query.filter(Giveaway.end_date <= now, Giveaway.announced == False).all()
+
+    for giveaway in giveaways:
+        # Select winners based on the number of prizes available
+        select_winners(giveaway.id, giveaway.participants_count)
+        
+        # Mark the giveaway as announced
+        giveaway.announced = True
+        db.session.commit()
+
+# Initialize the scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=process_ended_giveaways, trigger="interval", minutes=1)
+
+# Properly shut down the scheduler when the app is stopped
+@app.route('/shutdown_scheduler', methods=['POST'])
+def shutdown_scheduler():
+    scheduler.shutdown()
+    return jsonify({'success': True, 'message': 'Scheduler shut down successfully!'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Start the scheduler explicitly
+    scheduler.start()
+    print("Scheduler started")
+    
+    try:
+        app.run(debug=True)
+    except Exception as e:
+        print(f"Error: {e}")
