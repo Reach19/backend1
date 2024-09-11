@@ -20,6 +20,9 @@ migrate = Migrate(app, db)  # Initialize Flask-Migrate
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     telegram_id = db.Column(db.Text, nullable=False, unique=True)
+    first_name = db.Column(db.String(100), nullable=True)
+    last_name = db.Column(db.String(100), nullable=True)
+
 
 # Define the Channel model
 class Channel(db.Model):
@@ -81,19 +84,30 @@ def init_user():
     try:
         data = request.get_json()
         telegram_id = str(data.get('telegram_id'))  # Ensure it's treated as a string
+        first_name = data.get('first_name')  # Get first name
+        last_name = data.get('last_name')    # Get last name
 
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
 
+        # Check if the user already exists
         user = User.query.filter_by(telegram_id=telegram_id).first()
+
         if not user:
-            user = User(telegram_id=telegram_id)
+            # If not, create a new user
+            user = User(telegram_id=telegram_id, first_name=first_name, last_name=last_name)
             db.session.add(user)
+            db.session.commit()
+        else:
+            # Update the user's name if it already exists
+            user.first_name = first_name
+            user.last_name = last_name
             db.session.commit()
 
         return jsonify({'success': True, 'user_id': user.id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Endpoint to add a channel
 @app.route('/add_channel', methods=['POST'])
@@ -234,12 +248,22 @@ def get_winners(giveaway_id):
         if not giveaway:
             return jsonify({'success': False, 'message': 'Giveaway not found'}), 404
 
-        winners = Winner.query.filter_by(giveaway_id=giveaway_id).all()
-        winner_list = [{'id': winner.id, 'user_id': winner.user_id, 'giveaway_id': winner.giveaway_id} for winner in winners]
+        # Query to get winners along with their user details
+        winners = db.session.query(Winner, User).join(User, Winner.user_id == User.id).filter(Winner.giveaway_id == giveaway_id).all()
+
+        # Create a list of winners with their first and last names
+        winner_list = [{
+            'id': winner.Winner.id,
+            'user_id': winner.User.id,
+            'first_name': winner.User.first_name,
+            'last_name': winner.User.last_name,
+            'giveaway_id': winner.Winner.giveaway_id
+        } for winner in winners]
 
         return jsonify({'success': True, 'winners': winner_list})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
 
 # Function to send scheduled notifications for ending giveaways
 def check_and_send_notifications():
