@@ -37,7 +37,11 @@ class Giveaway(db.Model):
     end_date = db.Column(db.DateTime, nullable=False)
     channel_id = db.Column(db.Integer, db.ForeignKey('channel.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    announced = db.Column(db.Boolean, default=False)
+    announced = db.Column(db.Boolean, default=False)  # For giveaway announcement
+    winners_announced = db.Column(db.Boolean, default=False)  # New column for winner announcement
+
+# Define other models...
+
 
 # Define the Participant model
 class Participant(db.Model):
