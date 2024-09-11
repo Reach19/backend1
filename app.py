@@ -66,7 +66,9 @@ class Winner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     giveaway_id = db.Column(db.Integer, db.ForeignKey('giveaway.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    prize_amount = db.Column(db.Float, nullable=False)  # New field to store the prize amount for each winner
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 # Utility function to add a notification
 def add_notification(user_id, message, notif_type):
@@ -261,6 +263,25 @@ def get_winners(giveaway_id):
         } for winner in winners]
 
         return jsonify({'success': True, 'winners': winner_list})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/payment_method', methods=['POST'])
+def add_payment_method():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    payment_method = data.get('payment_method')
+
+    try:
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'}), 404
+
+        # Save the payment method for the user (you can store this in a new database field)
+        user.payment_method = payment_method
+        session.commit()
+
+        return jsonify({'success': True, 'message': 'Payment method added successfully'}), 200
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
