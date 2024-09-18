@@ -22,11 +22,10 @@ migrate = Migrate(app, db)  # Initialize Flask-Migrate
 from sqlalchemy import Column, String, Integer, Text
 
 class User(db.Model):
-    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.Text, unique=True, nullable=False)
-    first_name = db.Column(db.String, nullable=False)      
-    last_name = db.Column(db.String, nullable=True)      
+    telegram_id = db.Column(db.Text, nullable=False, unique=True)
+    first_name = db.Column(db.String(100), nullable=True)
+    last_name = db.Column(db.String(100), nullable=True)     
     username = db.Column(db.String, nullable=True, unique=True) 
 
 
