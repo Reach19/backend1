@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 from flask_cors import CORS
 from flask_migrate import Migrate
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 
 app = Flask(__name__)
@@ -164,13 +164,20 @@ def get_user_channels():
 def create_giveaway():
     try:
         data = request.get_json()
+        end_date_str = data.get('end_date')
 
         name = data.get('name')
         prize_amount = data.get('prize_amount')
         participants_count = data.get('participants_count')
-        end_date = data.get('end_date')
+        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')) # Handles ISO string
         channel_id = data.get('channel_id')
         user_id = data.get('user_id')
+
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+
+        else:
+            end_date = end_date.astimezone(timezone.utc)
 
         if not all([name, prize_amount, participants_count, end_date, channel_id, user_id]):
             return jsonify({'success': False, 'message': 'Missing required fields'}), 400
