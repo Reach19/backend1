@@ -73,6 +73,7 @@ class Winner(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     prize_amount = db.Column(db.Float, nullable=False)  # New field to store the prize amount for each winner
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    notified = db.Column(db.Boolean, default=False)
 
 
 # Utility function to add a notification
@@ -272,7 +273,8 @@ def get_winners(giveaway_id):
             'user_id': winner.User.id,
             'first_name': winner.User.first_name,
             'last_name': winner.User.last_name,
-            'giveaway_id': winner.Winner.giveaway_id
+            'giveaway_id': winner.Winner.giveaway_id,
+            'notified': winner.Winner.notified
         } for winner in winners]
 
         return jsonify({'success': True, 'winners': winner_list})
