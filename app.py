@@ -17,11 +17,17 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Initialize Flask-Migrate
 
 # Define the User model
+# models.py
+
+from sqlalchemy import Column, String, Integer, Text
+
 class User(db.Model):
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.Text, nullable=False, unique=True)
-    first_name = db.Column(db.String(100), nullable=True)
-    last_name = db.Column(db.String(100), nullable=True)
+    telegram_id = db.Column(db.Text, unique=True, nullable=False)
+    first_name = db.Column(db.String, nullable=False)      
+    last_name = db.Column(db.String, nullable=True)      
+    username = db.Column(db.String, nullable=True, unique=True) 
 
 
 # Define the Channel model
@@ -88,6 +94,7 @@ def init_user():
         telegram_id = str(data.get('telegram_id'))  # Ensure it's treated as a string
         first_name = data.get('first_name')  # Get first name
         last_name = data.get('last_name')    # Get last name
+        username = data.get('username')
 
         if not telegram_id:
             return jsonify({'success': False, 'message': 'Missing telegram_id'}), 400
@@ -97,7 +104,7 @@ def init_user():
 
         if not user:
             # If not, create a new user
-            user = User(telegram_id=telegram_id, first_name=first_name, last_name=last_name)
+            user = User(telegram_id=telegram_id, first_name=first_name, last_name=last_name, username=username)
             db.session.add(user)
             db.session.commit()
         else:
@@ -279,7 +286,7 @@ def add_payment_method():
 
         # Save the payment method for the user (you can store this in a new database field)
         user.payment_method = payment_method
-        session.commit()
+        db.session.commit()
 
         return jsonify({'success': True, 'message': 'Payment method added successfully'}), 200
     except Exception as e:
