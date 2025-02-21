@@ -5,9 +5,15 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from datetime import datetime, timezone
 import random
+import traceback 
+import logging
+
+# Setup logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": ["https://yabetsma.github.io"]}})
 
 # Configuring the SQLAlchemy Database URI and initializing the database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
@@ -145,21 +151,30 @@ def add_channel():
 # Endpoint to get channels for a specific user
 @app.route('/get_user_channels', methods=['GET'])
 def get_user_channels():
-    try:
-        user_id = request.args.get('user_id')
+    try: # Keep the try block, but enhance error logging
+        user_id_str = request.args.get('user_id')
 
-        if not user_id:
+        if not user_id_str:
             return jsonify({'success': False, 'message': 'Missing user_id parameter'}), 400
+
+        try:
+            user_id = int(user_id_str) # Convert user_id to integer
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Invalid user_id format. Must be an integer.'}), 400
 
         channels = Channel.query.filter_by(user_id=user_id).all()
         if not channels:
-            return jsonify({'success': False, 'message': 'No channels found.'}), 404
+            return jsonify({'success': False, 'message': 'No channels found for this user.'}), 404
 
         channel_list = [{'id': channel.id, 'username': channel.username} for channel in channels]
         return jsonify({'success': True, 'channels': channel_list})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
 
+    except Exception as e:
+        error_message = str(e)
+        trace = traceback.format_exc() # Get the full traceback
+        logger.error(f"Error in /get_user_channels: {error_message}\nTraceback:\n{trace}") # Log detailed error
+        return jsonify({'success': False, 'message': 'Backend error fetching channels', 'error': error_message}), 500
+    
 # Endpoint to create a giveaway
 @app.route('/create_giveaway', methods=['POST'])
 def create_giveaway():
