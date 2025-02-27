@@ -23,7 +23,7 @@ class Giveaway(Base):
     channel_id = Column(Integer, ForeignKey('channels.id'), nullable=False)
     name = Column(String, nullable=False)
     prize_amount = Column(Integer, nullable=False)
-    end_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime(timezone=True), nullable=False)
     announced = Column(Boolean, default=False)
     winner_ids = Column(Text, nullable=True)  # A comma-separated list of winner IDs
     channel = relationship('Channel', back_populates='giveaways')

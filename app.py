@@ -5,7 +5,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from datetime import datetime, timezone
 import random
-import traceback 
+import traceback
 import logging
 
 # Setup logging
@@ -13,7 +13,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["https://yabetsma.github.io"]}})
+CORS(app, origins="https://yabetsma.github.io", methods=["POST", "GET", "OPTIONS"], allow_headers=["Content-Type"])
 
 # Configuring the SQLAlchemy Database URI and initializing the database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres.ggxkqovbruyvfhdfkasw:dk22POZZTvc4HC4W@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
@@ -31,8 +31,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     telegram_id = db.Column(db.Text, nullable=False, unique=True)
     first_name = db.Column(db.String(100), nullable=True)
-    last_name = db.Column(db.String(100), nullable=True)     
-    username = db.Column(db.String, nullable=True, unique=True) 
+    last_name = db.Column(db.String(100), nullable=True)
+    username = db.Column(db.String, nullable=True, unique=True)
 
 
 # Define the Channel model
@@ -174,7 +174,38 @@ def get_user_channels():
         trace = traceback.format_exc() # Get the full traceback
         logger.error(f"Error in /get_user_channels: {error_message}\nTraceback:\n{trace}") # Log detailed error
         return jsonify({'success': False, 'message': 'Backend error fetching channels', 'error': error_message}), 500
-    
+
+# Endpoint to get giveaway details by ID
+@app.route('/get_giveaway_details', methods=['GET'])
+def get_giveaway_details():
+    giveaway_id = request.args.get('giveaway_id')
+    if not giveaway_id:
+        return jsonify({'success': False, 'message': 'Giveaway ID is required.'}), 400  # Bad Request
+
+    try:
+        giveaway_id_int = int(giveaway_id)
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Invalid giveaway ID format.'}), 400  # Bad Request
+
+    giveaway = Giveaway.query.get(giveaway_id_int) # Use .query.get() for direct ID lookup
+
+    if giveaway:
+        giveaway_data = {
+            'id': giveaway.id,
+            'name': giveaway.name,
+            'prize_amount': giveaway.prize_amount,
+            'participants_count': giveaway.participants_count,
+            'end_date': giveaway.end_date.isoformat(),  # Format datetime to ISO string
+            'channel_id': giveaway.channel_id,
+            'user_id': giveaway.user_id,
+            'announced': giveaway.announced,
+            'winners_announced': giveaway.winners_announced
+        }
+        return jsonify({'success': True, 'giveaway': giveaway_data})
+    else:
+        return jsonify({'success': False, 'message': 'Giveaway not found.'}), 404  # Not Found
+
+
 # Endpoint to create a giveaway
 @app.route('/create_giveaway', methods=['POST'])
 def create_giveaway():
@@ -185,13 +216,12 @@ def create_giveaway():
         name = data.get('name')
         prize_amount = data.get('prize_amount')
         participants_count = data.get('participants_count')
-        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')) # Handles ISO string
+        end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))  # Handles ISO string
         channel_id = data.get('channel_id')
         user_id = data.get('user_id')
 
         if end_date.tzinfo is None:
             end_date = end_date.replace(tzinfo=timezone.utc)
-
         else:
             end_date = end_date.astimezone(timezone.utc)
 
@@ -199,15 +229,15 @@ def create_giveaway():
             return jsonify({'success': False, 'message': 'Missing required fields'}), 400
 
         giveaway = Giveaway(
-            name=name, 
-            prize_amount=prize_amount, 
+            name=name,
+            prize_amount=prize_amount,
             participants_count=participants_count,
-            end_date=end_date, 
-            channel_id=channel_id, 
+            end_date=end_date,
+            channel_id=channel_id,
             user_id=user_id,
             announced=False
         )
-        
+
         db.session.add(giveaway)
         db.session.commit()
 
@@ -216,19 +246,26 @@ def create_giveaway():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 # Endpoint to join a giveaway
-@app.route('/join_giveaway', methods=['POST'])
-def join_giveaway():
+@app.route('/join_giveaway_action', methods=['POST'])  # Corrected endpoint name to match JS
+def join_giveaway_action(): # Corrected function name to match endpoint
     try:
         data = request.get_json()
-        telegram_id = str(data.get('telegram_id'))  # Convert to string
+        user_id = data.get('user_id') # Expecting user_id as integer now (from localStorage)
         giveaway_id = data.get('giveaway_id')
 
-        if not telegram_id or not giveaway_id:
-            return jsonify({'success': False, 'message': 'Missing telegram_id or giveaway_id'}), 400
+        if not user_id or not giveaway_id:
+            return jsonify({'success': False, 'message': 'Missing user_id or giveaway_id'}), 400
 
-        user = User.query.filter_by(telegram_id=telegram_id).first()
+        user = User.query.get(user_id) # Use .query.get() to fetch user by ID (integer)
         if not user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
+
+        giveaway = Giveaway.query.get(giveaway_id) # Use .query.get() to fetch giveaway by ID (integer)
+        if not giveaway:
+            return jsonify({'success': False, 'message': 'Giveaway not found'}), 404
+
+        if giveaway.end_date <= datetime.utcnow(): # Check if giveaway end date is in the past
+            return jsonify({'success': False, 'message': 'This giveaway has ended and cannot be joined.'}), 400
 
         participant = Participant.query.filter_by(user_id=user.id, giveaway_id=giveaway_id).first()
         if participant:
@@ -238,7 +275,7 @@ def join_giveaway():
         db.session.add(participant)
         db.session.commit()
 
-        add_notification(user.id, f"You have successfully joined the giveaway: {Giveaway.query.get(giveaway_id).name}", 'participant')
+        add_notification(user.id, f"You have successfully joined the giveaway: {giveaway.name}", 'participant')
 
         return jsonify({'success': True, 'message': 'Successfully joined the giveaway!'})
     except SQLAlchemyError as e:
@@ -303,7 +340,7 @@ def add_payment_method():
     payment_method = data.get('payment_method')
 
     try:
-        user = User.query.filter_by(id=user_id).first()
+        user = User.query.get(user_id)
         if not user:
             return jsonify({'success': False, 'message': 'User not found'}), 404
 
